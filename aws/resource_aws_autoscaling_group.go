@@ -923,12 +923,33 @@ func resourceAwsAutoscalingGroupUpdate(d *schema.ResourceData, meta interface{})
 		}
 
 		if len(add) > 0 {
-			_, err := conn.AttachLoadBalancerTargetGroups(&autoscaling.AttachLoadBalancerTargetGroupsInput{
-				AutoScalingGroupName: aws.String(d.Id()),
-				TargetGroupARNs:      add,
-			})
-			if err != nil {
-				return fmt.Errorf("Error updating Load Balancers Target Groups for AutoScaling Group (%s), error: %s", d.Id(), err)
+			if len(add) > 10 {
+				var chunked [][]string
+				chunkSize := 10
+				for i := 0; i < len(add); i += chunkSize {
+					end := i + chunkSize
+					if end > len(add) {
+						end = len(add)
+					}
+					chunked = append(chunked, add[i:end])
+				}
+				for chunk := range chunked {
+					_, err := conn.AttachLoadBalancerTargetGroups(&autoscaling.AttachLoadBalancerTargetGroupsInput{
+						AutoScalingGroupName: aws.String(d.Id()),
+						TargetGroupARNs:      chunk,
+					})
+					if err != nil {
+						return fmt.Errorf("Error updating Load Balancers Target Groups for AutoScaling Group (%s), error: %s", d.Id(), err)
+					}
+				}
+			} else {
+				_, err := conn.AttachLoadBalancerTargetGroups(&autoscaling.AttachLoadBalancerTargetGroupsInput{
+					AutoScalingGroupName: aws.String(d.Id()),
+					TargetGroupARNs:      add,
+				})
+				if err != nil {
+					return fmt.Errorf("Error updating Load Balancers Target Groups for AutoScaling Group (%s), error: %s", d.Id(), err)
+				}
 			}
 		}
 	}
